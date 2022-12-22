@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 const {dbName,dbUrl,mongodb,MongoClient} = require('../dbConfig');
 const {hashPassword,hashCompare,createToken,decodeToken,validity} = require('../bin/auth');
-
+const {UserDetails} = require('../dbSchema');
 const client = new MongoClient(dbUrl);
 
 //access this only if token exists
@@ -154,12 +154,20 @@ router.post('/login', async(req, res)=> {
   }
 });
 
-
+router.post('/add-user',async(req,res)=>{
+  try {
+    let users = await UserDetails.create(req.body);
+    res.send({statusCode:200,message:"User added successfully"})
+  } catch (error) {
+    console.log(error)
+    res.send({statusCode:500,message:"Internal Server Error",error})
+  }
+})
 router.put('/edit-user/:id',validity, async(req, res)=> {
   await client.connect();
   try {
-    const db = await client.db(dbName);
-    let users = await db.collection('users').updateOne({_id:mongodb.ObjectId(req.params.id)},{$set:req.body})
+    // const db = await client.db(dbName);
+    let users = await UserDetails.updateOne({_id:mongodb.ObjectId(req.params.id)},{$set:req.body})
     res.send({
       statusCode: 200,
       message:"User Edited Successfully",
@@ -178,47 +186,12 @@ router.put('/edit-user/:id',validity, async(req, res)=> {
   }
 });
 
-router.put('/edit-password/:id',validity,async(req,res)=>{
-  await client.connect();
-  try {
-    let db = await client.db(dbName)
-    let pwd = await db.collection('users').find({_id:mongodb.ObjectId(req.params.id)}).toArray();
-    if(pwd[0].password===req.body.oldPassword)
-    {
-        if(req.body.newPassword===req.body.confirmPassword)
-        {
-            let user = await db.collection('users').updateOne({_id:mongodb.ObjectId(req.params.id)},{$set:{password:req.body.newPassword}})
-            res.send({statusCode:200,message:"Password Updated Successfully"})
-        }
-        else{
-          res.send({statusCode:400,message:"New and Confirm Password does not match"
-          })
-        }
-    }
-    else{
-      res.send({
-        statusCode:400,
-        message:"Old Password does not match"
-      })
-    }
-  } catch (error) {
-    console.log(error)
-    res.send({ 
-      statusCode:500,
-      message:"Internal Server Error",
-      error
-    })
-  }
-  finally{
-    client.close()
-  }
-})
 
 router.delete('/delete-user/:id',validity, async(req, res)=> {
   await client.connect();
   try {
     const db = await client.db(dbName);
-    await db.collection('users').deleteOne({$and:[{_id:mongodb.ObjectId(req.params.id)},{role:'student'}]})
+    await UserDetails.deleteOne({$and:[{_id:mongodb.ObjectId(req.params.id)},{role:'student'}]})
     let users = await db.collection('users').find().toArray();
     res.send({
       statusCode: 200,
